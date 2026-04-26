@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhishDetect — Entrena tu ojo crítico</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e1117;
+    --surface: #161b27;
+    --surface-2: #1e2535;
+    --surface-3: #252d40;
+    --border: #2a3349;
+    --text: #e8eaf0;
+    --text-muted: #7a8399;
+    --text-dim: #4a5470;
+    --accent: #4f8ef7;
+    --accent-glow: rgba(79,142,247,0.2);
+    --danger: #f74f6a;
+    --danger-glow: rgba(247,79,106,0.2);
+    --success: #4ff7a3;
+    --success-glow: rgba(79,247,163,0.2);
+    --warning: #f7c34f;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 50% at 20% 20%, rgba(79,142,247,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 40% at 80% 80%, rgba(247,79,106,0.05) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ============================================
+     LAYOUT WRAPPER
+  ============================================ */
+  #app {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ============================================
+     HEADER
+  ============================================ */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 40px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(14,17,23,0.8);
+    backdrop-filter: blur(12px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.25rem;
+    letter-spacing: -0.01em;
+  }
+
+  .logo-icon {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, var(--accent), #7b4ff7);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+
+  .progress-bar-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .progress-track {
+    width: 180px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), #7b4ff7);
+    border-radius: 99px;
+    transition: width 0.5s cubic-bezier(0.34,1.56,0.64,1);
+  }
+
+  /* ============================================
+     SCREENS
+  ============================================ */
+  .screen {
+    display: none;
+    flex: 1;
+    padding: 40px;
+    max-width: 860px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .screen.active {
+    display: block;
+    animation: fadeSlideIn 0.4s ease forwards;
+  }
+
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ============================================
+     START SCREEN
+  ============================================ */
+  #screen-start {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 28px;
+    padding-top: 80px;
+  }
+
+  #screen-start.active { display: flex; }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: var(--accent-glow);
+    border: 1px solid rgba(79,142,247,0.3);
+    border-radius: 99px;
+    font-size: 0.78rem;
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .hero-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(2.4rem, 6vw, 3.8rem);
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    background: linear-gradient(135deg, var(--text) 0%, var(--text-muted) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    max-width: 640px;
+  }
+
+  .hero-subtitle {
+    font-size: 1.05rem;
+    color: var(--text-muted);
+    line-height: 1.65;
+    max-width: 500px;
+    font-weight: 300;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    width: 100%;
+    max-width: 620px;
+    margin-top: 8px;
+  }
+
+  .feature-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 16px;
+    text-align: left;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+
+  .feature-card:hover {
+    border-color: rgba(79,142,247,0.4);
+    transform: translateY(-2px);
+  }
+
+  .feature-icon { font-size: 1.4rem; margin-bottom: 8px; }
+  .feature-title { font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; }
+  .feature-desc { font-size: 0.78rem; color: var(--text-muted); line-height: 1.5; }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 36px;
+    background: linear-gradient(135deg, var(--accent), #7b4ff7);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 20px rgba(79,142,247,0.3);
+  }
+
+  .btn-primary:hover {
+    opacity: 0.92;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(79,142,247,0.45);
+  }
+
+  /* ============================================
+     QUIZ SCREEN
+  ============================================ */
+  #screen-quiz { display: none; padding-top: 32px; }
+  #screen-quiz.active { display: block; }
+
+  .question-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+
+  .question-counter {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .question-counter span {
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .question-prompt {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 16px;
+    max-width: 340px;
+  }
+
+  /* EMAIL CLIENT MOCKUP */
+  .email-client {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    margin-bottom: 28px;
+  }
+
+  .email-toolbar {
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .toolbar-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+
+  .toolbar-dot.red   { background: #f74f6a; }
+  .toolbar-dot.yellow{ background: #f7c34f; }
+  .toolbar-dot.green { background: #4ff7a3; }
+
+  .toolbar-title {
+    margin-left: 8px;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .email-header {
+    padding: 24px 28px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .email-subject {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+    line-height: 1.3;
+  }
+
+  .email-meta-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 12px;
+    font-size: 0.83rem;
+    align-items: start;
+  }
+
+  .email-meta-row .meta-label {
+    color: var(--text-dim);
+    font-weight: 500;
+    padding-top: 1px;
+    white-space: nowrap;
+  }
+
+  .email-meta-row .meta-value {
+    color: var(--text-muted);
+    word-break: break-all;
+  }
+
+  .email-meta-row .meta-value .sender-name {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .email-meta-row .meta-value .sender-addr {
+    color: var(--text-muted);
+  }
+
+  .email-body {
+    padding: 28px;
+    font-size: 0.92rem;
+    line-height: 1.8;
+    color: var(--text);
+  }
+
+  .email-body p { margin-bottom: 14px; }
+  .email-body p:last-child { margin-bottom: 0; }
+
+  /* SIMULATED LINKS */
+  .sim-link {
+    color: var(--accent);
+    text-decoration: underline;
+    cursor: pointer;
+    position: relative;
+    transition: color 0.2s;
+  }
+
+  .sim-link:hover { color: #7fb3ff; }
+
+  .sim-btn {
+    display: inline-block;
+    padding: 9px 22px;
+    background: linear-gradient(135deg, var(--accent), #5a6ef7);
+    color: #fff;
+    border-radius: var(--radius-sm);
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    font-family: 'DM Sans', sans-serif;
+    transition: opacity 0.2s, transform 0.2s;
+    margin: 6px 0;
+  }
+
+  .sim-btn:hover { opacity: 0.9; transform: scale(1.02); }
+
+  .sim-btn.danger-btn {
+    background: linear-gradient(135deg, var(--danger), #c74040);
+  }
+
+  /* ATTACHMENTS */
+  .email-attachments {
+    padding: 16px 28px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .attachment-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+
+  .attachment-chip:hover { border-color: var(--accent); }
+
+  .attachment-icon { font-size: 1rem; }
+  .attachment-size { font-size: 0.72rem; color: var(--text-dim); }
+
+  /* URL TOOLTIP */
+  #url-tooltip {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background: rgba(14,17,23,0.97);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    max-width: 480px;
+    word-break: break-all;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.15s, transform 0.15s;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(8px);
+  }
+
+  #url-tooltip.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  #url-tooltip .tooltip-label {
+    font-size: 0.66rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+  }
+
+  #url-tooltip .tooltip-url { color: var(--text); }
+
+  /* ANSWER BUTTONS */
+  .answer-section {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+  }
+
+  .btn-answer {
+    flex: 1;
+    max-width: 260px;
+    padding: 16px 20px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all 0.2s;
+  }
+
+  .btn-answer:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+
+  .btn-answer.legit:hover {
+    border-color: var(--success);
+    background: var(--success-glow);
+    color: var(--success);
+    box-shadow: 0 8px 24px rgba(79,247,163,0.15);
+  }
+
+  .btn-answer.phishing:hover {
+    border-color: var(--danger);
+    background: var(--danger-glow);
+    color: var(--danger);
+    box-shadow: 0 8px 24px rgba(247,79,106,0.15);
+  }
+
+  .btn-icon { font-size: 1.1rem; }
+
+  /* ============================================
+     RESULTS SCREEN
+  ============================================ */
+  #screen-results { display: none; text-align: center; padding-top: 60px; }
+  #screen-results.active { display: block; }
+
+  .score-ring-wrap {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 32px;
+  }
+
+  .score-ring {
+    position: relative;
+    width: 160px;
+    height: 160px;
+  }
+
+  .score-ring svg { transform: rotate(-90deg); }
+
+  .score-ring-track {
+    fill: none;
+    stroke: var(--border);
+    stroke-width: 10;
+  }
+
+  .score-ring-fill {
+    fill: none;
+    stroke-width: 10;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1.2s cubic-bezier(0.34,1.56,0.64,1);
+  }
+
+  .score-ring-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .score-number {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2.6rem;
+    line-height: 1;
+  }
+
+  .score-denom {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .results-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2rem;
+    margin-bottom: 10px;
+  }
+
+  .results-subtitle {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    max-width: 440px;
+    margin: 0 auto 36px;
+    line-height: 1.6;
+  }
+
+  /* RESULTS BREAKDOWN */
+  .results-breakdown {
+    max-width: 640px;
+    margin: 0 auto 36px;
+    text-align: left;
+  }
+
+  .breakdown-title {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 14px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .breakdown-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .breakdown-item {
+    display: grid;
+    grid-template-columns: 28px 1fr 24px;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.83rem;
+  }
+
+  .breakdown-item.correct { border-left: 3px solid var(--success); }
+  .breakdown-item.wrong   { border-left: 3px solid var(--danger); }
+
+  .breakdown-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+  }
+
+  .breakdown-subject { color: var(--text-muted); }
+
+  .breakdown-result { text-align: right; font-size: 0.9rem; }
+
+  .btn-restart {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 13px 32px;
+    background: transparent;
+    color: var(--text);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 8px;
+  }
+
+  .btn-restart:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    transform: translateY(-2px);
+  }
+
+  /* ============================================
+     TRANSITIONS
+  ============================================ */
+  .screen-exit {
+    animation: fadeOut 0.2s ease forwards;
+  }
+
+  @keyframes fadeOut {
+    to { opacity: 0; transform: translateY(-8px); }
+  }
+
+  .author-credit {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .author-credit strong {
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  /* ============================================
+     PDF MODAL
+  ============================================ */
+  .pdf-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(6px);
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+
+  .pdf-modal-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .pdf-modal-window {
+    width: min(680px, 94vw);
+    max-height: 80vh;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+    display: flex;
+    flex-direction: column;
+    transform: scale(0.96) translateY(8px);
+    transition: transform 0.25s cubic-bezier(0.34,1.4,0.64,1);
+    overflow: hidden;
+  }
+
+  .pdf-modal-overlay.open .pdf-modal-window {
+    transform: scale(1) translateY(0);
+  }
+
+  .pdf-modal-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+  }
+
+  .pdf-modal-filename {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pdf-modal-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+  }
+
+  .pdf-modal-close:hover { background: var(--surface-3); color: var(--text); }
+
+  .pdf-modal-viewer {
+    overflow-y: auto;
+    padding: 28px;
+    flex: 1;
+  }
+
+  .pdf-page {
+    background: #fff;
+    border-radius: 4px;
+    padding: 32px;
+    color: #1a1a1a;
+    min-height: 260px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+
+  .pdf-header-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 2px solid #e0e0e0;
+    padding-bottom: 14px;
+    margin-bottom: 20px;
+  }
+
+  .pdf-logo-fake {
+    font-size: 1.15rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: #111;
+  }
+
+  .pdf-doc-type {
+    font-size: 0.7rem;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.1em;
+    color: #888;
+    text-transform: uppercase;
+  }
+
+  .pdf-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    margin-bottom: 16px;
+  }
+
+  .pdf-table th {
+    text-align: left;
+    padding: 7px 10px;
+    background: #f5f5f5;
+    font-weight: 600;
+    font-size: 0.75rem;
+    color: #555;
+    border-bottom: 1px solid #ddd;
+  }
+
+  .pdf-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid #eee;
+    color: #333;
+  }
+
+  .pdf-table tr:last-child td { border-bottom: none; font-size: 0.84rem; }
+
+  .pdf-amount { text-align: right; font-weight: 600; }
+
+  .pdf-notice {
+    font-size: 0.74rem;
+    color: #888;
+    line-height: 1.6;
+    border-top: 1px solid #eee;
+    padding-top: 12px;
+    margin-top: 4px;
+  }
+
+  .pdf-fake-link { color: #c0392b; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; }
+  .danger-text { color: #c0392b; }
+
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+  /* ============================================
+     RESPONSIVE
+  ============================================ */
+  @media (max-width: 640px) {
+    header { padding: 16px 20px; }
+    .screen { padding: 20px; }
+    .features-grid { grid-template-columns: 1fr; }
+    .answer-section { flex-direction: column; align-items: center; }
+    .btn-answer { max-width: 100%; width: 100%; }
+    .email-header, .email-body { padding: 18px; }
+    .progress-track { width: 100px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🛡</div>
+      PhishDetect
+    </div>
+    <div class="author-credit">Creado por <strong>Juan Luis Torralbo Muñoz</strong></div>
+    <div class="progress-bar-container" id="header-progress" style="display:none">
+      <span id="progress-label">0 / 15</span>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- START SCREEN -->
+  <div class="screen active" id="screen-start">
+    <div class="hero-badge">🎓 Simulador de Phishing</div>
+    <h1 class="hero-title">¿Sabrías detectar un correo falso?</h1>
+    <p class="hero-subtitle">
+      Analiza 15 correos electrónicos reales y de phishing. Examina remitentes,
+      enlaces y archivos adjuntos para decidir si son legítimos o un engaño.
+    </p>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🔗</div>
+        <div class="feature-title">Hover sobre enlaces</div>
+        <div class="feature-desc">Pasa el ratón sobre cualquier enlace para ver la URL real.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📨</div>
+        <div class="feature-title">15 casos reales</div>
+        <div class="feature-desc">Google, bancos, mensajería, RRHH y facturas falsas.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <div class="feature-title">Puntuación final</div>
+        <div class="feature-desc">Descubre cuántos engaños detectaste al terminar.</div>
+      </div>
+    </div>
+    <button class="btn-primary" onclick="startQuiz()">
+      Comenzar el test
+      <span>→</span>
+    </button>
+  </div>
+
+  <!-- QUIZ SCREEN -->
+  <div class="screen" id="screen-quiz">
+    <div class="question-meta">
+      <div class="question-counter">
+        Pregunta <span id="q-current">1</span> de <span>15</span>
+      </div>
+      <div class="question-prompt">
+        ¿Este correo es legítimo o phishing?
+      </div>
+    </div>
+
+    <div class="email-client" id="email-card">
+      <div class="email-toolbar">
+        <div class="toolbar-dot red"></div>
+        <div class="toolbar-dot yellow"></div>
+        <div class="toolbar-dot green"></div>
+        <span class="toolbar-title">Bandeja de entrada</span>
+      </div>
+      <div class="email-header">
+        <div class="email-subject" id="email-subject">—</div>
+        <div class="email-meta-row">
+          <span class="meta-label">De:</span>
+          <span class="meta-value" id="email-from">—</span>
+          <span class="meta-label">Para:</span>
+          <span class="meta-value" id="email-to">—</span>
+          <span class="meta-label">Fecha:</span>
+          <span class="meta-value" id="email-date">—</span>
+        </div>
+      </div>
+      <div class="email-body" id="email-body">—</div>
+      <div class="email-attachments" id="email-attachments" style="display:none"></div>
+    </div>
+
+    <div class="answer-section">
+      <button class="btn-answer legit" onclick="answer('legit')">
+        <span class="btn-icon">✅</span> Es legítimo
+      </button>
+      <button class="btn-answer phishing" onclick="answer('phishing')">
+        <span class="btn-icon">🎣</span> Es phishing
+      </button>
+    </div>
+  </div>
+
+  <!-- RESULTS SCREEN -->
+  <div class="screen" id="screen-results">
+    <div class="score-ring-wrap">
+      <div class="score-ring">
+        <svg viewBox="0 0 160 160" width="160" height="160">
+          <circle class="score-ring-track" cx="80" cy="80" r="70"/>
+          <circle class="score-ring-fill" id="score-arc" cx="80" cy="80" r="70"
+            stroke-dasharray="439.82"
+            stroke-dashoffset="439.82"/>
+        </svg>
+        <div class="score-ring-text">
+          <div class="score-number" id="result-score">0</div>
+          <div class="score-denom">de 15</div>
+        </div>
+      </div>
+    </div>
+    <h2 class="results-title" id="results-title">—</h2>
+    <p class="results-subtitle" id="results-subtitle">—</p>
+
+    <div class="results-breakdown">
+      <div class="breakdown-title">Desglose por pregunta</div>
+      <div class="breakdown-list" id="breakdown-list"></div>
+    </div>
+
+    <button class="btn-restart" onclick="restartQuiz()">
+      🔄 Volver a intentarlo
+    </button>
+  </div>
+
+</div>
+
+<!-- PDF MODAL -->
+<div id="pdf-modal" class="pdf-modal-overlay" onclick="closePdfModal(event)">
+  <div class="pdf-modal-window">
+    <div class="pdf-modal-titlebar">
+      <div class="pdf-modal-filename" id="pdf-modal-filename">documento.pdf</div>
+      <button class="pdf-modal-close" onclick="closePdfModal(null)">✕</button>
+    </div>
+    <div class="pdf-modal-viewer">
+      <div class="pdf-page" id="pdf-modal-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- URL TOOLTIP -->
+<div id="url-tooltip">
+  <div class="tooltip-label">URL destino</div>
+  <div class="tooltip-url" id="tooltip-url-text"></div>
+</div>
+
+<script>
+// =============================================
+//  QUESTIONS DATA
+// =============================================
+const questions = [
+  {
+    id: 1,
+    type: 'phishing',
+    subject: 'Tu cuenta de Google ha sido bloqueada',
+    from: { name: 'Google Security', addr: 'no-reply@g00gle-accounts.com' },
+    to: 'alumno@example.com',
+    date: 'Lun, 21 abr 2025, 09:12',
+    body: `<p>Estimado usuario,</p>
+<p>Hemos detectado un <strong>acceso sospechoso</strong> en tu cuenta de Google desde un dispositivo desconocido en Rumanía. Por tu seguridad, hemos bloqueado temporalmente el acceso.</p>
+<p>Para recuperar tu cuenta y verificar tu identidad, debes hacer clic en el siguiente enlace <strong>en las próximas 24 horas</strong>:</p>
+<p><button class="sim-btn danger-btn" data-url="http://g00gle-accounts-security.ru/verify?token=8f7d2a">🔒 Verificar mi cuenta ahora</button></p>
+<p>Si no realizas esta acción, tu cuenta será eliminada permanentemente.</p>
+<p>Atentamente,<br>Equipo de Seguridad de Google</p>`,
+    attachments: null,
+    explanation: 'El dominio del remitente es "g00gle-accounts.com" (con ceros en lugar de oes) y la URL apunta a un dominio .ru'
+  },
+  {
+    id: 2,
+    type: 'legit',
+    subject: 'Tu pedido #ES-2847631 ha sido enviado',
+    from: { name: 'Amazon.es', addr: 'shipment-tracking@amazon.es' },
+    to: 'alumno@example.com',
+    date: 'Mar, 22 abr 2025, 14:30',
+    body: `<p>Hola,</p>
+<p>¡Buenas noticias! Tu pedido <strong>#ES-2847631</strong> ha sido recogido por el transportista y está en camino.</p>
+<p><strong>Artículo:</strong> Logitech MX Keys S (teclado inalámbrico)<br>
+<strong>Entrega estimada:</strong> Jueves, 24 de abril</p>
+<p>Puedes seguir el estado de tu envío aquí:<br>
+<a class="sim-link" data-url="https://www.amazon.es/gp/your-account/order-history?orderId=ES-2847631">Ver seguimiento del pedido</a></p>
+<p>Gracias por comprar en Amazon.</p>`,
+    attachments: null,
+    explanation: 'El remitente es amazon.es, la URL apunta al dominio oficial de Amazon España'
+  },
+  {
+    id: 3,
+    type: 'phishing',
+    subject: 'URGENTE: Cargo no reconocido en tu cuenta — Acción requerida',
+    from: { name: 'Banco Santander', addr: 'alertas@santander-seguridad-online.net' },
+    to: 'alumno@example.com',
+    date: 'Mié, 23 abr 2025, 07:45',
+    body: `<p>Estimado cliente,</p>
+<p>Hemos detectado un cargo <strong>no autorizado de 1.248,00 €</strong> realizado el día de hoy en tu cuenta. Para cancelarlo y proteger tus fondos, necesitamos que confirmes tus datos inmediatamente.</p>
+<p>Si no reconoces esta operación, accede a la plataforma segura y bloquea la transacción:</p>
+<p><button class="sim-btn danger-btn" data-url="http://santander-seguridad-online.net/bloquear-cargo?cliente=84772">Cancelar cargo ahora</button></p>
+<p>Si no actúas antes de las <strong>18:00 h de hoy</strong>, el cargo será procesado definitivamente.</p>
+<p>Santander Online Banking</p>`,
+    attachments: [
+      { name: 'Detalle_cargo_092025.pdf', size: '88 KB', icon: '📄', pdfContent: `<div class="pdf-header-row"><span class="pdf-logo-fake">BANCO SANTANDER</span><span class="pdf-doc-type">NOTIFICACIÓN DE CARGO</span></div><table class="pdf-table"><tr><th>Concepto</th><th>Importe</th></tr><tr><td>Transferencia internacional — Cuenta destino: RO49AAAA1B31007593840000</td><td class="pdf-amount danger-text">−1.248,00 €</td></tr><tr><td>Fecha de operación</td><td>23/04/2025</td></tr><tr><td>Referencia</td><td>TRF-2025-092841</td></tr></table><p class="pdf-notice">Para impugnar esta operación acceda a: <span class="pdf-fake-link">http://santander-seguridad-online.net/impugnar</span></p>` }
+    ],
+    explanation: 'El dominio "santander-seguridad-online.net" no es el oficial (bancosantander.es). Además crea urgencia artificial y solicita confirmar datos.'
+  },
+  {
+    id: 4,
+    type: 'legit',
+    subject: 'Aviso de entrega: tu paquete llegará mañana',
+    from: { name: 'FedEx Spain', addr: 'noreply@fedex.com' },
+    to: 'alumno@example.com',
+    date: 'Jue, 24 abr 2025, 10:05',
+    body: `<p>Hola,</p>
+<p>Tu paquete con número de seguimiento <strong>7489 2371 9023</strong> está en tránsito y se entregará <strong>mañana viernes 25 de abril</strong> entre las 09:00 y las 14:00 h.</p>
+<p>Dirección de entrega: Calle Mayor 42, 28001 Madrid</p>
+<p>Si necesitas cambiar la fecha o la dirección:<br>
+<a class="sim-link" data-url="https://www.fedex.com/es-es/tracking.html?tracknumbers=748923719023">Gestionar mi entrega</a></p>
+<p>FedEx Spain</p>`,
+    attachments: null,
+    explanation: 'El remitente es @fedex.com (dominio oficial) y el enlace apunta a fedex.com/es-es, que es el sitio oficial de FedEx en España.'
+  },
+  {
+    id: 5,
+    type: 'phishing',
+    subject: 'Alguien intentó acceder a tu cuenta de Instagram',
+    from: { name: 'Instagram', addr: 'security@lnstagram-help.com' },
+    to: 'alumno@example.com',
+    date: 'Vie, 25 abr 2025, 22:17',
+    body: `<p>Hola,</p>
+<p>Detectamos un <strong>intento de inicio de sesión</strong> en tu cuenta de Instagram desde un dispositivo no reconocido.</p>
+<p><strong>Dispositivo:</strong> Android / Chrome — Ciudad de México<br>
+<strong>Hora:</strong> 22:14 UTC</p>
+<p>Si no fuiste tú, asegura tu cuenta ahora:<br>
+<a class="sim-link" data-url="http://lnstagram-help.com/secure-account?user=alumno&token=x9k2">Proteger mi cuenta</a></p>
+<p>Si fuiste tú, puedes ignorar este mensaje.</p>
+<p>El equipo de Instagram</p>`,
+    attachments: null,
+    explanation: 'El dominio "lnstagram-help.com" usa una "l" minúscula en lugar de "i" (lnstagram vs instagram). El dominio oficial es @mail.instagram.com.'
+  },
+  {
+    id: 6,
+    type: 'legit',
+    subject: 'Resumen de tu factura — marzo 2025',
+    from: { name: 'Iberdrola', addr: 'facturas@iberdrola.es' },
+    to: 'alumno@example.com',
+    date: 'Sáb, 5 abr 2025, 08:00',
+    body: `<p>Estimado cliente,</p>
+<p>Te informamos de que ya tienes disponible la factura correspondiente al período del <strong>1 al 31 de marzo de 2025</strong>.</p>
+<p><strong>Importe a pagar:</strong> 67,42 €<br>
+<strong>Fecha de cargo:</strong> 15 de abril de 2025<br>
+<strong>CUPS:</strong> ES0031405342819001WA</p>
+<p>Puedes descargar tu factura y gestionar tu contrato en tu área de cliente:<br>
+<a class="sim-link" data-url="https://www.iberdrola.es/area-privada-clientes">Acceder a mi área privada</a></p>
+<p>Iberdrola, S.A.</p>`,
+    attachments: [
+      { name: 'Factura_Iberdrola_Marzo2025.pdf', size: '124 KB', icon: '📄', pdfContent: `<div class="pdf-header-row"><span class="pdf-logo-fake" style="color:#006837">iberdrola</span><span class="pdf-doc-type">FACTURA DE ENERGÍA</span></div><table class="pdf-table"><tr><th>Concepto</th><th>Importe</th></tr><tr><td>Energía activa (01/03 – 31/03/2025) · 312 kWh</td><td>52,18 €</td></tr><tr><td>Potencia contratada (3,45 kW)</td><td>11,40 €</td></tr><tr><td>Impuesto sobre electricidad (5,11%)</td><td>2,22 €</td></tr><tr><td>IVA (21%)</td><td>1,62 €</td></tr><tr><td><strong>Total a pagar</strong></td><td><strong>67,42 €</strong></td></tr></table><p class="pdf-notice">Cargo en cuenta el 15/04/2025. IBAN: ES91 2100 0418 4502 0005 1332. Iberdrola S.A. — CIF: A-48010615</p>` }
+    ],
+    explanation: 'El dominio del remitente es @iberdrola.es (oficial) y la URL apunta al sitio oficial iberdrola.es.'
+  },
+  {
+    id: 7,
+    type: 'phishing',
+    subject: 'Factura #2025-0392 pendiente de pago — Iberdrola',
+    from: { name: 'Facturación Iberdrola', addr: 'facturacion@lberdrola-pagos.com' },
+    to: 'alumno@example.com',
+    date: 'Lun, 14 abr 2025, 11:33',
+    body: `<p>Estimado cliente,</p>
+<p>Su factura correspondiente al período de febrero–marzo de 2025 por un importe de <strong>143,20 €</strong> se encuentra <strong>vencida y pendiente de pago</strong>.</p>
+<p>Para evitar la interrupción del suministro eléctrico, realice el pago inmediatamente a través del siguiente enlace seguro:</p>
+<p><button class="sim-btn" data-url="http://lberdrola-pagos.com/pago-online?factura=2025-0392&cliente=9921">Pagar factura ahora</button></p>`,
+    attachments: [
+      { name: 'Factura_2025_0392.exe', size: '2.1 MB', icon: '⚠️' }
+    ],
+    explanation: 'El dominio "lberdrola-pagos.com" usa "l" en lugar de "i". El adjunto es un .exe, lo que es completamente inusual para una factura.'
+  },
+  {
+    id: 8,
+    type: 'legit',
+    subject: 'Bienvenido/a al equipo — Documentación de incorporación',
+    from: { name: 'RRHH — TechCorp España', addr: 'rrhh@techcorp.es' },
+    to: 'alumno@techcorp.es',
+    date: 'Lun, 7 abr 2025, 09:00',
+    body: `<p>Hola,</p>
+<p>¡Bienvenido/a a <strong>TechCorp España</strong>! Estamos muy contentos de tenerte en el equipo.</p>
+<p>Adjunto encontrarás:</p>
+<p>– Contrato de trabajo para tu revisión y firma digital<br>
+– Guía de bienvenida con toda la información que necesitas<br>
+– Formulario de datos bancarios para la nómina (rellenar antes del viernes)</p>
+<p>Si tienes alguna duda, responde a este correo o contáctanos en la extensión <strong>204</strong>.</p>
+<p>¡Hasta el lunes!<br>María García — Recursos Humanos</p>`,
+    attachments: [
+      { name: 'Contrato_Incorporacion_2025.pdf', size: '341 KB', icon: '📄', pdfContent: `<div class="pdf-header-row"><span class="pdf-logo-fake">TechCorp España, S.L.</span><span class="pdf-doc-type">CONTRATO DE TRABAJO</span></div><p style="font-size:0.82rem;color:#7a8399;line-height:1.7;margin-bottom:12px">En Madrid, a 7 de abril de 2025. De una parte, <strong>TechCorp España, S.L.</strong> (CIF B-87654321), representada por Dña. Carmen López, Directora de RRHH. De otra parte, el/la trabajador/a D./Dña. <strong>____________</strong>.</p><table class="pdf-table"><tr><th>Cláusula</th><th>Detalle</th></tr><tr><td>Puesto</td><td>Analista de Sistemas Junior</td></tr><tr><td>Jornada</td><td>40 h / semana</td></tr><tr><td>Salario bruto anual</td><td>28.000 €</td></tr><tr><td>Fecha de inicio</td><td>14/04/2025</td></tr></table>` },
+      { name: 'Guia_Bienvenida.pdf', size: '2.1 MB', icon: '📄', pdfContent: `<div class="pdf-header-row"><span class="pdf-logo-fake">TechCorp España, S.L.</span><span class="pdf-doc-type">GUÍA DE BIENVENIDA</span></div><p style="font-size:0.82rem;color:#7a8399;line-height:1.7">Bienvenido/a al equipo. En este documento encontrarás toda la información que necesitas para tu primer día: acceso a las herramientas, políticas internas, directorio del equipo y procedimientos de seguridad.</p><table class="pdf-table"><tr><th>Sección</th><th>Página</th></tr><tr><td>Estructura de la empresa</td><td>3</td></tr><tr><td>Herramientas y accesos</td><td>8</td></tr><tr><td>Política de seguridad</td><td>14</td></tr><tr><td>Beneficios y RRHH</td><td>21</td></tr></table>` }
+    ],
+    explanation: 'El remitente usa el dominio corporativo real @techcorp.es. No hay urgencia artificial ni enlaces sospechosos. Los archivos son PDFs.'
+  },
+  {
+    id: 9,
+    type: 'phishing',
+    subject: 'Actualiza los datos bancarios para recibir tu nómina',
+    from: { name: 'RRHH — TechCorp España', addr: 'rrhh-nominas@techcorp-rrhh.info' },
+    to: 'alumno@techcorp.es',
+    date: 'Mar, 29 abr 2025, 16:55',
+    body: `<p>Hola,</p>
+<p>Para garantizar que el pago de la nómina del mes de abril se procese correctamente, necesitamos que actualices los datos de tu cuenta bancaria <strong>antes del miércoles 30 a las 12:00 h</strong>.</p>
+<p>Accede al portal seguro de RRHH y rellena el formulario:</p>
+<p><button class="sim-btn" data-url="http://techcorp-rrhh.info/actualizar-cuenta?emp=4421">Actualizar cuenta bancaria</button></p>
+<p>Si no actualizas los datos a tiempo, el pago podría retrasarse varios días.</p>
+<p>Departamento de Nóminas</p>`,
+    attachments: null,
+    explanation: 'El dominio "@techcorp-rrhh.info" es diferente al oficial @techcorp.es. Además solicita datos bancarios con urgencia artificial.'
+  },
+  {
+    id: 10,
+    type: 'legit',
+    subject: 'Confirmación de tu suscripción a Netflix',
+    from: { name: 'Netflix', addr: 'info@account.netflix.com' },
+    to: 'alumno@example.com',
+    date: 'Mar, 1 abr 2025, 13:20',
+    body: `<p>Hola,</p>
+<p>Tu suscripción a Netflix ha sido renovada correctamente.</p>
+<p><strong>Plan:</strong> Estándar con anuncios<br>
+<strong>Importe:</strong> 7,99 € / mes<br>
+<strong>Próxima facturación:</strong> 1 de mayo de 2025</p>
+<p>Si tienes preguntas sobre tu cuenta, visita nuestro Centro de ayuda:<br>
+<a class="sim-link" data-url="https://help.netflix.com/es-es">Centro de ayuda de Netflix</a></p>
+<p>— El equipo de Netflix</p>`,
+    attachments: null,
+    explanation: 'El subdominio account.netflix.com es legítimo (Netflix usa este dominio). La URL de ayuda apunta a help.netflix.com.'
+  },
+  {
+    id: 11,
+    type: 'phishing',
+    subject: 'UPS: No hemos podido entregar tu paquete',
+    from: { name: 'UPS España', addr: 'entrega@ups-delivery-track.info' },
+    to: 'alumno@example.com',
+    date: 'Mié, 16 abr 2025, 08:01',
+    body: `<p>Estimado cliente,</p>
+<p>Lamentamos informarle de que <strong>no hemos podido entregar</strong> su paquete hoy por ausencia en el domicilio.</p>
+<p>Para reprogramar la entrega, deberá abonar los <strong>gastos de reenvío (1,99 €)</strong> a través de nuestro portal seguro:</p>
+<p><a class="sim-link" data-url="http://ups-delivery-track.info/reenvio?pkg=EU9381762&pay=1.99">Reprogramar entrega y pagar gastos</a></p>
+<p>Tiene <strong>48 horas</strong> para gestionar la nueva entrega o el paquete será devuelto al remitente.</p>
+<p>UPS España</p>`,
+    attachments: null,
+    explanation: 'El dominio "ups-delivery-track.info" no es el oficial (ups.com/es). UPS nunca cobra tasas de reenvío a través de correo electrónico.'
+  },
+  {
+    id: 12,
+    type: 'legit',
+    subject: 'Revisión de seguridad: actividad reciente en tu cuenta de Google',
+    from: { name: 'Google', addr: 'no-reply@accounts.google.com' },
+    to: 'alumno@example.com',
+    date: 'Jue, 17 abr 2025, 19:04',
+    body: `<p>Hola,</p>
+<p>Recientemente se inició sesión en tu Cuenta de Google desde un nuevo dispositivo. Si fuiste tú, no es necesario que hagas nada.</p>
+<p><strong>Dispositivo:</strong> Windows / Chrome<br>
+<strong>Ubicación aproximada:</strong> Madrid, España<br>
+<strong>Hora:</strong> 18:59 UTC+2</p>
+<p>Si no reconoces esta actividad, puedes revisar los dispositivos vinculados a tu cuenta:<br>
+<a class="sim-link" data-url="https://myaccount.google.com/device-activity">Ver actividad del dispositivo</a></p>
+<p>Atentamente,<br>El equipo de Google</p>`,
+    attachments: null,
+    explanation: 'El remitente es @accounts.google.com (dominio oficial de Google para notificaciones). La URL apunta a myaccount.google.com.'
+  },
+  {
+    id: 13,
+    type: 'phishing',
+    subject: '¡Has ganado un iPhone 15 Pro! Recoge tu premio',
+    from: { name: 'Apple Rewards España', addr: 'premios@apple-rewards-spain.com' },
+    to: 'alumno@example.com',
+    date: 'Vie, 18 abr 2025, 12:00',
+    body: `<p>¡Enhorabuena!</p>
+<p>Has sido seleccionado/a como <strong>ganador/a del sorteo mensual de Apple España</strong> y has ganado un <strong>iPhone 15 Pro 256 GB</strong> valorado en 1.229 €.</p>
+<p>Para reclamar tu premio debes:</p>
+<p>1. Confirmar tu identidad<br>
+2. Pagar únicamente los gastos de envío (<strong>2,95 €</strong>)<br>
+3. Proporcionar tu dirección de entrega</p>
+<p><button class="sim-btn" data-url="http://apple-rewards-spain.com/reclamar?winner=true&id=99123">🎁 Reclamar mi iPhone ahora</button></p>
+<p>Este enlace expirará en <strong>24 horas</strong>.</p>`,
+    attachments: null,
+    explanation: 'Apple no realiza sorteos por correo electrónico. El dominio "apple-rewards-spain.com" no es oficial (apple.com/es). Pedir datos bancarios/envío es una señal clásica de estafa.'
+  },
+  {
+    id: 14,
+    type: 'legit',
+    subject: 'Tu extracto de cuenta — BBVA, abril 2025',
+    from: { name: 'BBVA España', addr: 'comunicaciones@bbva.es' },
+    to: 'alumno@bbva-clientes.es',
+    date: 'Mié, 2 abr 2025, 07:00',
+    body: `<p>Estimado cliente,</p>
+<p>Ya está disponible tu extracto de cuenta correspondiente al mes de <strong>marzo 2025</strong>.</p>
+<p><strong>Saldo disponible:</strong> 1.847,35 €<br>
+<strong>Movimientos:</strong> 23 transacciones</p>
+<p>Consulta el extracto completo en tu banca online:<br>
+<a class="sim-link" data-url="https://www.bbva.es/personas/banca-online/acceso.html">Acceder a BBVA Online</a></p>
+<p>Por seguridad, BBVA nunca te pedirá tus claves por correo electrónico o teléfono.</p>
+<p>BBVA, S.A.</p>`,
+    attachments: [
+      { name: 'Extracto_Marzo2025_BBVA.pdf', size: '210 KB', icon: '📄', pdfContent: `<div class="pdf-header-row"><span class="pdf-logo-fake" style="color:#004481">BBVA</span><span class="pdf-doc-type">EXTRACTO DE CUENTA — MARZO 2025</span></div><table class="pdf-table"><tr><th>Fecha</th><th>Concepto</th><th>Importe</th><th>Saldo</th></tr><tr><td>03/03</td><td>Nómina TechCorp España</td><td style="color:#4ff7a3">+2.100,00 €</td><td>3.247,35 €</td></tr><tr><td>08/03</td><td>Alquiler Piso Mayor 42</td><td class="danger-text">−850,00 €</td><td>2.397,35 €</td></tr><tr><td>12/03</td><td>Compra Amazon</td><td class="danger-text">−89,99 €</td><td>2.307,36 €</td></tr><tr><td>20/03</td><td>Supermercado Mercadona</td><td class="danger-text">−124,80 €</td><td>2.182,56 €</td></tr><tr><td>28/03</td><td>Iberdrola factura luz</td><td class="danger-text">−67,42 €</td><td>1.847,35 €</td></tr></table>` }
+    ],
+    explanation: 'El remitente es @bbva.es (dominio oficial). La URL apunta a bbva.es. Además incluye el mensaje de advertencia habitual de que no piden claves.'
+  },
+  {
+    id: 15,
+    type: 'phishing',
+    subject: 'Tu suscripción a Microsoft 365 ha caducado',
+    from: { name: 'Microsoft 365', addr: 'billing@microsoft-365-renewal.com' },
+    to: 'alumno@example.com',
+    date: 'Jue, 24 abr 2025, 16:22',
+    body: `<p>Estimado usuario,</p>
+<p>Tu suscripción a <strong>Microsoft 365 Personal</strong> caducó el 23 de abril de 2025. Tus archivos de OneDrive y acceso a Office serán <strong>eliminados en 30 días</strong> si no renuevas.</p>
+<p>Renueva ahora con un <strong>50% de descuento</strong> exclusivo:</p>
+<p><button class="sim-btn" data-url="http://microsoft-365-renewal.com/renew?promo=50off&user=alumno">Renovar Microsoft 365 — Solo 29,99€/año</button></p>
+<p>Microsoft Corporation</p>`,
+    attachments: null,
+    explanation: 'El dominio "microsoft-365-renewal.com" no es de Microsoft. El dominio oficial es microsoft.com. Las renovaciones siempre van a account.microsoft.com.'
+  }
+];
+
+// =============================================
+//  APP STATE
+// =============================================
+let currentQ = 0;
+let answers  = [];
+let shuffledQuestions = [];
+
+// Fisher-Yates shuffle
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// =============================================
+//  TOOLTIP LOGIC
+// =============================================
+const tooltip    = document.getElementById('url-tooltip');
+const tooltipUrl = document.getElementById('tooltip-url-text');
+
+function attachTooltipListeners() {
+  document.querySelectorAll('[data-url]').forEach(el => {
+    el.addEventListener('mouseenter', () => {
+      tooltipUrl.textContent = el.dataset.url;
+      tooltip.classList.add('visible');
+    });
+    el.addEventListener('mouseleave', () => {
+      tooltip.classList.remove('visible');
+    });
+  });
+}
+
+// =============================================
+//  RENDER QUESTION
+// =============================================
+function renderQuestion(idx) {
+  const q = shuffledQuestions[idx];
+
+  document.getElementById('q-current').textContent = idx + 1;
+
+  // Progress
+  const pct = (idx / 15) * 100;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = idx + ' / 15';
+
+  document.getElementById('email-subject').textContent = q.subject;
+  document.getElementById('email-from').innerHTML =
+    `<span class="sender-name">${q.from.name}</span> <span class="sender-addr">&lt;${q.from.addr}&gt;</span>`;
+  document.getElementById('email-to').textContent   = q.to;
+  document.getElementById('email-date').textContent  = q.date;
+  document.getElementById('email-body').innerHTML    = q.body;
+
+  // Attachments
+  const attContainer = document.getElementById('email-attachments');
+  if (q.attachments && q.attachments.length > 0) {
+    attContainer.style.display = 'flex';
+    attContainer.innerHTML = q.attachments.map((a, i) => {
+      const isExe = a.name.toLowerCase().endsWith('.exe');
+      const onclick = isExe
+        ? `openExeTrap()`
+        : `openPdfModal(${idx}, ${i})`;
+      return `<div class="attachment-chip" onclick="${onclick}">
+        <span class="attachment-icon">${a.icon}</span>
+        <div>
+          <div>${a.name}</div>
+          <div class="attachment-size">${a.size}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    attContainer.style.display = 'none';
+    attContainer.innerHTML = '';
+  }
+
+  attachTooltipListeners();
+
+  // Animate email card in
+  const card = document.getElementById('email-card');
+  card.style.opacity = '0';
+  card.style.transform = 'translateY(12px)';
+  requestAnimationFrame(() => {
+    card.style.transition = 'opacity 0.35s ease, transform 0.35s ease';
+    card.style.opacity = '1';
+    card.style.transform = 'translateY(0)';
+  });
+}
+
+// =============================================
+//  NAVIGATION
+// =============================================
+function startQuiz() {
+  currentQ = 0;
+  answers  = [];
+  shuffledQuestions = shuffle(questions);
+  showScreen('screen-quiz');
+  document.getElementById('header-progress').style.display = 'flex';
+  renderQuestion(0);
+}
+
+function answer(choice) {
+  const q = shuffledQuestions[currentQ];
+  answers.push({ q, choice, correct: choice === q.type });
+  currentQ++;
+
+  if (currentQ < shuffledQuestions.length) {
+    renderQuestion(currentQ);
+  } else {
+    showResults();
+  }
+}
+
+// =============================================
+//  PDF MODAL
+// =============================================
+function openPdfModal(qIdx, attIdx) {
+  const att = shuffledQuestions[qIdx].attachments[attIdx];
+  document.getElementById('pdf-modal-filename').textContent = att.name;
+  document.getElementById('pdf-modal-content').innerHTML = att.pdfContent || '<p style="color:#888;text-align:center;padding:40px">Vista previa no disponible.</p>';
+  document.getElementById('pdf-modal').classList.add('open');
+}
+
+function closePdfModal(event) {
+  if (event === null || event.target === document.getElementById('pdf-modal')) {
+    document.getElementById('pdf-modal').classList.remove('open');
+  }
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => {
+    s.classList.remove('active');
+  });
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// =============================================
+//  RESULTS
+// =============================================
+function showResults() {
+  const score = answers.filter(a => a.correct).length;
+  showScreen('screen-results');
+
+  document.getElementById('result-score').textContent = score;
+  document.getElementById('progress-fill').style.width = '100%';
+  document.getElementById('progress-label').textContent = '15 / 15';
+
+  // Score ring animation
+  const arc = document.getElementById('score-arc');
+  const circumference = 2 * Math.PI * 70; // 439.82
+  const pct = score / 15;
+  const offset = circumference * (1 - pct);
+
+  // Color based on score
+  let strokeColor;
+  if (pct >= 0.8)       strokeColor = '#4ff7a3';
+  else if (pct >= 0.5)  strokeColor = '#f7c34f';
+  else                  strokeColor = '#f74f6a';
+
+  arc.style.stroke = strokeColor;
+  setTimeout(() => { arc.style.strokeDashoffset = offset; }, 100);
+
+  // Title & subtitle
+  let title, subtitle;
+  if (score === 15)         { title = '¡Perfecto! Eres un experto 🏆';    subtitle = 'Detectaste todos los intentos de phishing. Tienes un ojo muy entrenado para identificar correos maliciosos.'; }
+  else if (score >= 12)     { title = '¡Muy bien! Casi perfecto 🎯';      subtitle = 'Has detectado la mayoría de los engaños. Repasa los casos que fallaste para seguir mejorando.'; }
+  else if (score >= 9)      { title = 'Resultado sólido 👍';              subtitle = 'Reconoces muchas señales de phishing, pero algunos correos consiguieron engañarte. ¡Sigue practicando!'; }
+  else if (score >= 6)      { title = 'Necesitas practicar más 📚';       subtitle = 'Tienes la base, pero los atacantes consiguieron engañarte varias veces. Presta especial atención a los dominios.'; }
+  else                      { title = 'Ojo con el phishing ⚠️';           subtitle = 'Muchos correos te engañaron. Revisa bien los dominios del remitente y los enlaces antes de hacer clic.'; }
+
+  document.getElementById('results-title').textContent    = title;
+  document.getElementById('results-subtitle').textContent = subtitle;
+
+  // Breakdown
+  const list = document.getElementById('breakdown-list');
+  list.innerHTML = answers.map((a, i) => `
+    <div class="breakdown-item ${a.correct ? 'correct' : 'wrong'}">
+      <span class="breakdown-num">${String(i+1).padStart(2,'0')}</span>
+      <div>
+        <div class="breakdown-subject">${a.q.subject}</div>
+        <div style="font-size:0.74rem;color:var(--text-dim);margin-top:3px">
+          ${a.q.type === 'phishing' ? '🎣 Era phishing' : '✅ Era legítimo'} —
+          ${a.correct ? 'Acertaste' : 'Fallaste'}
+        </div>
+      </div>
+      <span class="breakdown-result">${a.correct ? '✅' : '❌'}</span>
+    </div>
+  `).join('');
+}
+
+function openExeTrap() {
+  // Clicking a .exe = fell for the trap = force wrong answer and advance
+  const q = shuffledQuestions[currentQ];
+  // Record as if they answered 'legit' (wrong, since it's phishing)
+  answers.push({ q, choice: 'legit', correct: false });
+  currentQ++;
+
+  // Show a brief overlay before advancing
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(247,79,106,0.12);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    z-index:800;backdrop-filter:blur(4px);animation:fadeSlideIn 0.2s ease;
+  `;
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--danger);border-radius:var(--radius);
+      padding:32px 40px;text-align:center;max-width:360px;box-shadow:0 12px 40px rgba(247,79,106,0.25);">
+      <div style="font-size:2.2rem;margin-bottom:12px">☠️</div>
+      <div style="font-size:1rem;font-weight:700;color:var(--danger);margin-bottom:8px">
+        Has ejecutado el archivo
+      </div>
+      <div style="font-size:0.85rem;color:var(--text-muted);line-height:1.6">
+        En un equipo real, este archivo habría instalado malware.
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  setTimeout(() => {
+    document.body.removeChild(overlay);
+    if (currentQ < shuffledQuestions.length) {
+      renderQuestion(currentQ);
+    } else {
+      showResults();
+    }
+  }, 2200);
+}
+
+function restartQuiz() {
+  document.getElementById('header-progress').style.display = 'none';
+  showScreen('screen-start');
+}
+</script>
+
+<!-- FOOTER AUTOR -->
+<footer style="border-top:1px solid var(--border);padding:16px 40px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:0.75rem;color:var(--text-dim);font-family:'JetBrains Mono',monospace;background:rgba(14,17,23,0.8);backdrop-filter:blur(12px);">
+  <span>Autor:</span>
+  <span style="color:var(--text-muted);font-weight:500">Juan Luis Torralbo Muñoz</span>
+  <span style="color:var(--border);margin:0 6px">·</span>
+  <span>Material docente — PhishDetect</span>
+</footer>
+
+</body>
+</html>
